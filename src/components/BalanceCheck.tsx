@@ -2,8 +2,9 @@ import { Inter } from "next/font/google";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import * as Web3 from "@solana/web3.js";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,13 +20,37 @@ export function BalanceCheck() {
   });
   const [balance, setBalance] = useState<number>();
 
+  useEffect(() => {
+    const keypair = Web3.Keypair.generate();
+
+    const publicKey = keypair.publicKey.toString();
+    const privateKey = keypair.secretKey.toString();
+
+    const instruction = Web3.SystemProgram.createAccount({
+      fromPubkey: keypair.publicKey,
+      newAccountPubkey: keypair.publicKey,
+      lamports: LAMPORTS_PER_SOL * 1000,
+      space: 999999,
+      programId: Web3.SystemProgram.programId,
+    });
+    const transaction = new Web3.Transaction();
+    transaction.add(instruction);
+    const connection = new Web3.Connection(Web3.clusterApiUrl("devnet"));
+    Web3.sendAndConfirmTransaction(connection, transaction, [keypair])
+      .then(console.log)
+      .catch(console.error);
+    console.log({ publicKey, privateKey });
+  }, []);
+
   const onSubmit = async (values: Schema) => {
     try {
       const { address } = values;
       const publicKey = new Web3.PublicKey(address);
       const connection = new Web3.Connection(Web3.clusterApiUrl("devnet"));
       const balance = await connection.getBalance(publicKey);
+      const accountInfo = await connection.getAccountInfo(publicKey);
       setBalance(balance);
+      console.log(accountInfo);
     } catch (err) {
       console.log(err);
     }
